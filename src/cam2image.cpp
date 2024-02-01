@@ -23,6 +23,7 @@
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/videoio.hpp"
+#include "./capture_screen.hpp"
 
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -34,6 +35,8 @@
 
 #include "./burger.hpp"
 #include "./policy_maps.hpp"
+
+// 
 
 RCLCPP_USING_CUSTOM_TYPE_AS_ROS_MESSAGE_TYPE(
   image_tools::ROSCvMatContainer,
@@ -94,7 +97,7 @@ private:
     sub_ = create_subscription<std_msgs::msg::Bool>(
       "flip_image", rclcpp::SensorDataQoS(), callback);
 
-    if (!burger_mode_) {
+    if (!burger_mode_ && !screen_capture_mode_) {
       // Initialize OpenCV video capture stream.
       cap.open(device_id_);
 
@@ -123,6 +126,8 @@ private:
     // Get the frame from the video capture.
     if (burger_mode_) {
       frame = burger_cap.render_burger(width_, height_);
+    } else if (screen_capture_mode_){
+      capture_screen::captureScreen(frame);
     } else {
       cap >> frame;
     }
@@ -140,7 +145,9 @@ private:
     // Conditionally show image
     if (show_camera_) {
       // Show the image in a window called "cam2image".
-      cv::imshow("cam2image", frame);
+      cv::Mat show;
+      cv::cvtColor(frame.clone(), show, cv::COLOR_RGBA2BGRA, 4);
+      cv::imshow("cam2image", show);
       // Draw the image to the screen and wait 1 millisecond.
       cv::waitKey(1);
     }
@@ -182,6 +189,8 @@ private:
       ss << "  frequency\tPublish frequency in Hz. Default value is 30";
       ss << std::endl;
       ss << "  burger_mode\tProduce images of burgers rather than connecting to a camera";
+      ss << std::endl;
+      ss << "  screen_capture_mode\tStream (parts) of your screen instead of connecting to a camera";
       ss << std::endl;
       ss << "  show_camera\tShow camera stream. Either 'true' or 'false' (default)";
       ss << std::endl;
@@ -249,6 +258,10 @@ private:
     burger_mode_desc.description = "Produce images of burgers rather than connecting to a camera";
     burger_mode_ = this->declare_parameter("burger_mode", false, burger_mode_desc);
     frame_id_ = this->declare_parameter("frame_id", "camera_frame");
+
+    rcl_interfaces::msg::ParameterDescriptor screen_capture_mode_desc;
+    screen_capture_mode_desc.description = "Stream (parts) of your screen instead of connecting to a camera";
+    screen_capture_mode_ = this->declare_parameter("screen_capture_mode", false, screen_capture_mode_desc);
   }
 
   cv::VideoCapture cap;
@@ -267,6 +280,7 @@ private:
   size_t width_;
   size_t height_;
   bool burger_mode_;
+  bool screen_capture_mode_;
   std::string frame_id_;
   int device_id_;
 
